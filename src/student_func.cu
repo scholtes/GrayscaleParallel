@@ -1,5 +1,7 @@
 // Homework 1
 // Color to Greyscale Conversion
+// Student: Garrett Scholtes
+// Date:    2015-10-05
 
 //A common way to represent color images is known as RGBA - the color
 //is specified by how much Red, Grean and Blue is in it.
@@ -33,12 +35,13 @@
 
 #include "utils.h"
 
+#define THREADS_PER_BLOCK 1024
+
 __global__
 void rgba_to_greyscale(const uchar4* const rgbaImage,
                        unsigned char* const greyImage,
                        int numRows, int numCols)
 {
-  //TODO
   //Fill in the kernel to convert from color to greyscale
   //the mapping from components of a uchar4 to RGBA is:
   // .x -> R ; .y -> G ; .z -> B ; .w -> A
@@ -50,15 +53,25 @@ void rgba_to_greyscale(const uchar4* const rgbaImage,
   //First create a mapping from the 2D block and grid locations
   //to an absolute 2D location in the image, then use that to
   //calculate a 1D offset
+  size_t pixelIndex = blockIdx.x*THREADS_PER_BLOCK + threadIdx.x;
+  if (pixelIndex < numRows * numCols) {
+    uchar4 rgba = rgbaImage[pixelIndex];
+    float channelSum = .299f * rgba.x + .587f * rgba.y + .114f * rgba.z;
+    greyImage[pixelIndex] = channelSum;
+  }
 }
 
 void your_rgba_to_greyscale(const uchar4 * const h_rgbaImage, uchar4 * const d_rgbaImage,
                             unsigned char* const d_greyImage, size_t numRows, size_t numCols)
 {
-  //You must fill in the correct sizes for the blockSize and gridSize
-  //currently only one block with one thread is being launched
-  const dim3 blockSize(1, 1, 1);  //TODO
-  const dim3 gridSize( 1, 1, 1);  //TODO
+  // We will simply use a one dimensional system here, rather than splitting the image into
+  // rectangular or square blocks.  The math is just as easy and solves this particular
+  // problem just as effectively.
+  size_t numPixels = numRows * numCols;
+  size_t numBlocksPerGrid = 1 + ((numPixels - 1) / THREADS_PER_BLOCK);
+
+  const dim3 blockSize(THREADS_PER_BLOCK);
+  const dim3 gridSize(numBlocksPerGrid);
   rgba_to_greyscale<<<gridSize, blockSize>>>(d_rgbaImage, d_greyImage, numRows, numCols);
   
   cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
